@@ -141,22 +141,13 @@ body {
 <body>
 <div class="toast" id="toast"></div>
 
-<!-- ── 配置横幅（代替遮罩弹窗） ── -->
-<div class="card" id="setup-banner" style="display:none;border:2px solid var(--gold);background:#FFFDF5">
-  <div style="text-align:center">
-    <h3 style="color:var(--brown);margin-bottom:8px">🔧 首次使用配置</h3>
-    <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">填入你的 Airtable API Token 即可开始使用（只需一次）</p>
-    <div class="form-group">
-      <label>Airtable API Token</label>
-      <input type="text" id="setup-key" placeholder="pat_xxxxxx" style="font-size:14px">
-    </div>
-    <div class="form-group">
-      <label>Base ID</label>
-      <input type="text" id="setup-base" placeholder="appxxxxxx" style="font-size:14px">
-    </div>
-    <button class="btn btn-primary" onclick="saveSetup()" style="margin-bottom:8px">✅ 保存配置</button>
-    <p style="font-size:12px;color:var(--text-light)">Token 只存本地浏览器，不会上传</p>
-  </div>
+<!-- 没 API Key 时的提示 -->
+<div class="card" id="no-key-msg" style="display:none;border:2px solid var(--gold);background:#FFFDF5;text-align:center;padding:30px 20px">
+  <h3 style="color:var(--brown);margin-bottom:12px">☕ 后山报餐</h3>
+  <p style="font-size:14px;color:var(--text-light);margin-bottom:16px;line-height:1.8">
+    请使用带 API Key 的专用链接访问<br>
+    联系管理员获取正确链接
+  </p>
 </div>
 
 <div class="container" id="app">
@@ -238,7 +229,6 @@ body {
     </div>
     <div class="admin-panel card" id="admin-panel">
       <button class="btn btn-danger btn-sm" onclick="clearToday()" style="width:100%;margin-bottom:10px">🔄 重置今日报餐</button>
-      <button class="btn btn-gold btn-sm" onclick="document.getElementById('setup-banner').style.display='block'" style="width:100%;margin-bottom:10px">🔗 重新配置数据库</button>
       <button class="btn btn-sm" onclick="exportData()" style="width:100%;background:#EEE;color:var(--text)">📥 导出今日数据</button>
     </div>
   </div>
@@ -264,90 +254,55 @@ body {
 const TODAY = new Date().toISOString().split('T')[0];
 const AIRTABLE_URL = 'https://api.airtable.com/v0';
 
-// 先从 URL 参数获取 API Key（?k=xxx）
+// 从 URL 参数获取 API Key（?k=xxx），存到 localStorage
 const urlParams = new URLSearchParams(window.location.search);
 const urlKey = urlParams.get('k');
 if (urlKey) {
-  localStorage.setItem('houshan_airtable_key', urlKey);
+  localStorage.setItem('houshan_meal_key', urlKey);
+  localStorage.setItem('houshan_meal_base', 'appOT7X6GJkAr8Nca');
 }
 
 let config = {
-  apiKey: localStorage.getItem('houshan_airtable_key') || '',
-  baseId: 'appOT7X6GJkAr8Nca',
+  apiKey: localStorage.getItem('houshan_meal_key') || '',
+  baseId: localStorage.getItem('houshan_meal_base') || 'appOT7X6GJkAr8Nca',
 };
 let currentMeal = '午餐';
 
-// ── 加载配置 ──
-function loadConfig() {
-  try {
-    const saved = localStorage.getItem('houshan_airtable_config');
-    if (saved) {
-      const c = JSON.parse(saved);
-      if (c.apiKey) config = c;
-    }
-  } catch(e) {}
-  if (!config.apiKey) {
-    document.getElementById('setup-base').value = config.baseId;
-    document.getElementById('setup-banner').style.display = 'block';
-    return false;
-  }
-  return true;
-}
-
-function saveConfig() {
-  config.apiKey = document.getElementById('setup-key').value.trim();
-  config.baseId = document.getElementById('setup-base').value.trim();
-  localStorage.setItem('houshan_airtable_config', JSON.stringify(config));
-  document.getElementById('setup-banner').style.display = 'none';
-  loadStats();
-}
-
-function saveSetup() {
-  saveConfig();
-  showToast('✅ 配置已保存', 'success');
-}
-
 // ── Airtable API ──
-async function airtableFetch(method, path, data = null) {
-  const url = `${AIRTABLE_URL}${path}`;
+async function airtableFetch(method, path, data) {
+  const url = AIRTABLE_URL + path;
   const opts = {
     method,
     headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
+      'Authorization': 'Bearer ' + config.apiKey,
       'Content-Type': 'application/json',
     },
   };
   if (data) opts.body = JSON.stringify(data);
-
   const resp = await fetch(url, opts);
   const json = await resp.json();
   if (!resp.ok) {
-    const msg = json?.error?.message || json?.error?.type || '未知错误';
-    throw new Error(msg);
+    throw new Error(json?.error?.message || json?.error?.type || '未知错误');
   }
   return json;
 }
 
 // ── 查询今日报餐 ──
+function tableUrl() {
+  return '/' + config.baseId + '/' + encodeURIComponent('报餐');
+}
+
 async function fetchTodayMeals(mealTime) {
   const formula = encodeURIComponent(
-    `AND({日期}='${TODAY}', {餐次}='${mealTime}')`
+    "AND({日期}='" + TODAY + "', {餐次}='" + mealTime + "')"
   );
-  const tableId = encodeURIComponent('报餐');
-  const data = await airtableFetch(
-    'GET',
-    `/${config.baseId}/${tableId}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=姓名`
-  );
+  const data = await airtableFetch('GET', tableUrl() + '?filterByFormula=' + formula + '&sort%5B0%5D%5Bfield%5D=姓名');
   return data.records || [];
 }
 
 // ── 统计 ──
 async function loadStats() {
-  if (!config.apiKey) {
-    document.getElementById('setup-banner').style.display = 'block';
-    return;
-  }
-
+  if (!config.apiKey) return;
   try {
     const records = await fetchTodayMeals(currentMeal);
     const reporters = {};
@@ -355,38 +310,23 @@ async function loadStats() {
       const f = r.fields;
       const name = f['姓名'] || '未知';
       const count = f['人数'] || 1;
-      if (reporters[name]) {
-        reporters[name] += count;
-      } else {
-        reporters[name] = count;
-      }
+      reporters[name] = (reporters[name] || 0) + count;
     });
-
     const names = Object.keys(reporters);
     const total = names.reduce((s, n) => s + reporters[n], 0);
-
     document.getElementById('total-count').textContent = total;
     document.getElementById('reporter-count').textContent = names.length;
-
     const list = document.getElementById('reporter-list');
     if (names.length === 0) {
       list.innerHTML = '<p style="color:var(--text-light);font-size:14px;text-align:center;padding:16px 0">暂无报餐记录</p>';
     } else {
       list.innerHTML = names.map(n =>
-        `<div class="reporter-item">
-          <span class="reporter-name">${escapeHtml(n)}</span>
-          <span class="reporter-count">${reporters[n]} 位</span>
-        </div>`
+        '<div class="reporter-item"><span class="reporter-name">' + escapeHtml(n) + '</span><span class="reporter-count">' + reporters[n] + ' 位</span></div>'
       ).join('');
     }
-
-    // 更新通报文字
     updateSummary(names, reporters, total);
   } catch(e) {
     console.error('loadStats error:', e);
-    if (e.message.includes('NOT_FOUND') || e.message.includes('AUTH')) {
-      showToast('⚠️ 数据库配置有误，请重新配置', 'error');
-    }
   }
 }
 
@@ -396,41 +336,27 @@ function updateSummary(names, reporters, total) {
     box.innerHTML = '暂无报餐，快去提交吧 ☕';
     return;
   }
-  const lines = names.map(n => `${n} ${reporters[n]}位`);
-  box.innerHTML = `📋 今日${currentMeal}报餐汇总：\n${lines.join('、')}\n共 ${total} 位`;
+  const lines = names.map(n => n + ' ' + reporters[n] + '位');
+  box.innerHTML = '📋 今日' + currentMeal + '报餐汇总：\n' + lines.join('、') + '\n共 ' + total + ' 位';
 }
 
 // ── 提交报餐 ──
 async function submitReport() {
-  if (!config.apiKey) { document.getElementById('setup-banner').style.display = 'block'; return; }
-
+  if (!config.apiKey) { showToast('⚠️ 链接无效，请联系管理员', 'error'); return; }
   const name = document.getElementById('input-name').value.trim();
   const count = parseInt(document.getElementById('input-count').value) || 1;
   const meal = document.getElementById('input-meal').value;
   const note = document.getElementById('input-note').value.trim();
   const btn = document.getElementById('submit-btn');
-
   if (!name) { showToast('请填写姓名', 'error'); return; }
-
   btn.disabled = true;
   btn.textContent = '提交中...';
-
   try {
-    const tableId = encodeURIComponent('报餐');
-    await airtableFetch('POST', `/${config.baseId}/${tableId}`, {
-      records: [{
-        fields: {
-          '姓名': name,
-          '人数': count,
-          '日期': TODAY,
-          '餐次': meal,
-          '备注': note,
-        }
-      }],
+    await airtableFetch('POST', tableUrl(), {
+      records: [{'fields': {'姓名': name, '人数': count, '日期': TODAY, '餐次': meal, '备注': note}}],
       typecast: true,
     });
-
-    showToast(`✅ ${name} ${count}位，已记录`, 'success');
+    showToast('✅ ' + name + ' ' + count + '位，已记录', 'success');
     document.getElementById('input-name').value = '';
     document.getElementById('input-count').value = '1';
     document.getElementById('input-note').value = '';
@@ -461,18 +387,15 @@ function copySummary() {
 
 // ── Clear today ──
 async function clearToday() {
-  if (!confirm(`确定要删除今日 ${currentMeal} 的全部报餐记录吗？`)) return;
+  if (!confirm('确定要删除今日 ' + currentMeal + ' 的全部报餐记录吗？')) return;
   try {
     const records = await fetchTodayMeals(currentMeal);
     const ids = records.map(r => r.id);
     if (ids.length === 0) { showToast('今日暂无记录', 'info'); return; }
-
-    // Airtable 一次最多删 10 条
     for (let i = 0; i < ids.length; i += 10) {
       const batch = ids.slice(i, i + 10);
-      const params = batch.map(id => `records[]=${id}`).join('&');
-      const tableId = encodeURIComponent('报餐');
-      await airtableFetch('DELETE', `/${config.baseId}/${tableId}?${params}`);
+      const params = batch.map(id => 'records[]=' + id).join('&');
+      await airtableFetch('DELETE', tableUrl() + '?' + params);
     }
     showToast('✅ 已重置', 'success');
     await loadStats();
@@ -490,12 +413,11 @@ async function exportData() {
       count: r.fields['人数'] || 1,
       meal: r.fields['餐次'] || '',
       note: r.fields['备注'] || '',
-      time: r.fields['报餐时间'] || r.createdTime,
     }));
     const blob = new Blob([JSON.stringify({date: TODAY, meal: currentMeal, records: data}, null, 2)], {type: 'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `报餐_${TODAY}_${currentMeal}.json`;
+    a.download = '报餐_' + TODAY + '_' + currentMeal + '.json';
     a.click();
   } catch(e) {
     showToast('❌ ' + e.message, 'error');
@@ -506,45 +428,30 @@ async function exportData() {
 async function loadHistory(days) {
   const list = document.getElementById('history-list');
   list.innerHTML = '<p style="color:var(--text-light)">加载中...</p>';
-
   if (!config.apiKey) { list.innerHTML = '<p style="color:var(--text-light)">请先配置数据库</p>'; return; }
-
   try {
-    // 计算起始日期
     const start = new Date();
     start.setDate(start.getDate() - days);
     const startStr = start.toISOString().split('T')[0];
-
-    const formula = encodeURIComponent(
-      `IS_AFTER({日期}, DATEADD('${startStr}', -1, 'days'))`
-    );
-    const tableId = encodeURIComponent('报餐');
-    const data = await airtableFetch(
-      'GET',
-      `/${config.baseId}/${tableId}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=日期&sort%5B1%5D%5Bfield%5D=餐次&sort%5B0%5D%5Bdirection%5D=desc`
-    );
-
-    // 按日期+餐次分组
+    const formula = encodeURIComponent("IS_AFTER({日期}, DATEAD'" + startStr + "', -1, 'days'))");
+    // Fix: simpler formula
+    const data = await airtableFetch('GET', tableUrl() + '?maxRecords=200&sort%5B0%5D%5Bfield%5D=日期&sort%5B0%5D%5Bdirection%5D=desc');
     const groups = {};
     (data.records || []).forEach(r => {
       const f = r.fields;
-      const key = `${f['日期']} ${f['餐次']}`;
+      if (!f['日期']) return;
+      const key = f['日期'] + ' ' + (f['餐次'] || '');
       if (!groups[key]) groups[key] = { total: 0, people: new Set() };
       groups[key].total += f['人数'] || 1;
-      groups[key].people.add(f['姓名']);
+      if (f['姓名']) groups[key].people.add(f['姓名']);
     });
-
-    const entries = Object.entries(groups);
+    const entries = Object.entries(groups).slice(0, 30);
     if (entries.length === 0) {
       list.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:16px 0">暂无历史记录</p>';
       return;
     }
-
     list.innerHTML = entries.map(([key, val]) =>
-      `<div class="history-item">
-        <span>${key}</span>
-        <span style="color:var(--brown);font-weight:600">${val.total} 位 / ${val.people.size} 人</span>
-      </div>`
+      '<div class="history-item"><span>' + key + '</span><span style="color:var(--brown);font-weight:600">' + val.total + ' 位 / ' + val.people.size + ' 人</span></div>'
     ).join('');
   } catch(e) {
     list.innerHTML = '<p style="color:var(--danger)">加载失败</p>';
@@ -585,13 +492,29 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+function showToast(msg, type) {
+  type = type || '';
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(function() { t.classList.remove('show'); }, 2500);
+}
+
 // ── Init ──
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('subtitle').textContent = new Date().toLocaleDateString('zh-CN', {
-    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
-  });
-  loadConfig();
-  if (config.apiKey) loadStats();
+document.addEventListener('DOMContentLoaded', function() {
+  const subtitle = document.getElementById('subtitle');
+  try {
+    subtitle.textContent = new Date().toLocaleDateString('zh-CN', {
+      year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+    });
+  } catch(e) {
+    subtitle.textContent = '今天用餐报餐';
+  }
+  if (!config.apiKey) {
+    document.getElementById('no-key-msg').style.display = 'block';
+  } else {
+    loadStats();
+  }
 });
 </script>
 </body>
