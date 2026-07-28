@@ -251,8 +251,8 @@ body {
   <div id="page-history" style="display:none">
     <div class="tabs">
       <button class="tab active" onclick="loadHistory(7)" id="hd-7">近7天</button>
-      <button class="tab" onclick="loadHistory(14)" id="hd-14">近14天</button>
-      <button class="tab" onclick="loadHistory(30)" id="hd-30">近30天</button>
+      <button class="tab" onclick="loadHistory(15)" id="hd-15">近15天</button>
+      <button class="tab" onclick="loadHistory('last-month')" id="hd-last">上个月</button>
     </div>
     <div class="card">
       <h3 style="font-size:15px;color:var(--text-light);margin-bottom:8px">📅 报餐记录</h3>
@@ -461,13 +461,26 @@ async function loadHistory(days) {
   list.innerHTML = '<p style="color:var(--text-light)">加载中...</p>';
   if (!config.apiKey) { list.innerHTML = '<p style="color:var(--text-light)">请先配置数据库</p>'; return; }
   try {
+    // 计算日期范围
+    var startDate = new Date();
+    var label = '';
+    if (days === 'last-month') {
+      // 上个月：上个月1号 到 上个月最后一天
+      startDate.setDate(1);
+      startDate.setMonth(startDate.getMonth() - 1);
+      var endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + 1);
+      endDate.setDate(0);  // 上个月最后一天
+      label = '上个月';
+    } else {
+      startDate.setDate(startDate.getDate() - days);
+      label = '近' + days + '天';
+    }
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = days === 'last-month' ? endDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    
     // 查询报餐数据
     const data = await airtableFetch('GET', tableUrl() + '?maxRecords=500&sort%5B0%5D%5Bfield%5D=日期&sort%5B0%5D%5Bdirection%5D=desc');
-    
-    // 按日期筛选
-    const start = new Date();
-    start.setDate(start.getDate() - days);
-    const startStr = start.toISOString().split('T')[0];
     
     // 个人统计 + 日期分组
     const personTotals = {};
@@ -476,7 +489,9 @@ async function loadHistory(days) {
     
     (data.records || []).forEach(r => {
       const f = r.fields;
-      if (!f['日期'] || f['日期'] < startStr) return;
+      if (!f['日期']) return;
+      if (f['日期'] < startStr) return;
+      if (days === 'last-month' && f['日期'] > endStr) return;
       filteredCount++;
       
       // 按日期+餐次分组
@@ -513,7 +528,7 @@ async function loadHistory(days) {
     var grandTotal = personNames.reduce(function(s, n) { return s + personTotals[n].meals; }, 0);
     
     html += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--gold-light)">';
-    html += '<h4 style="font-size:13px;color:var(--text-light);margin-bottom:6px">👤 个人统计（近' + days + '天）</h4>';
+    html += '<h4 style="font-size:13px;color:var(--text-light);margin-bottom:6px">👤 个人统计（' + label + '）</h4>';
     html += '<div class="reporter-item" style="font-size:12px;color:var(--text-light);font-weight:500">';
     html += '<span>姓名</span><span style="flex:1;text-align:center">报餐次数</span><span style="text-align:right">总人数</span>';
     html += '</div>';
