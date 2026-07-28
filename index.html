@@ -1,1 +1,644 @@
-<!DOCTYPE html><html><body><h1>test</h1></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>后山报餐系统</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --brown: #8B6B4A;
+  --brown-light: #A88B6F;
+  --brown-bg: #F5EDE6;
+  --brown-card: #FFFFFF;
+  --gold: #C9A96E;
+  --gold-light: #E8D5B7;
+  --text: #3D2E1E;
+  --text-light: #7A6A5A;
+  --danger: #C0392B;
+  --success: #27AE60;
+  --radius: 12px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--brown-bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+.container { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+.header { text-align: center; padding: 24px 0 16px; }
+.header h1 { font-size: 22px; color: var(--brown); font-weight: 700; letter-spacing: 2px; }
+.header .subtitle { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+.header .setup-notice {
+  font-size: 12px; color: var(--danger); margin-top: 8px;
+  background: #FFF3E0; padding: 8px 12px; border-radius: 8px;
+}
+
+.card {
+  background: var(--brown-card); border-radius: var(--radius);
+  padding: 20px; margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(139,107,74,0.08);
+}
+
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block; font-size: 14px; color: var(--text-light);
+  margin-bottom: 4px; font-weight: 500;
+}
+.form-group input, .form-group select {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid var(--gold-light); border-radius: 8px;
+  font-size: 16px; color: var(--text); background: #FFF;
+  outline: none; transition: border-color 0.2s;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--gold); }
+
+.btn {
+  width: 100%; padding: 12px; border: none; border-radius: 8px;
+  font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.btn-primary { background: var(--brown); color: #FFF; }
+.btn-primary:hover { background: var(--brown-light); }
+.btn-primary:disabled { background: #CCC; cursor: not-allowed; }
+.btn-gold { background: var(--gold); color: #FFF; }
+.btn-sm { padding: 6px 14px; font-size: 13px; width: auto; border-radius: 6px; }
+
+.stats-row { display: flex; justify-content: space-around; text-align: center; padding: 8px 0; }
+.stat-item h2 { font-size: 32px; color: var(--brown); font-weight: 700; }
+.stat-item p { font-size: 13px; color: var(--text-light); margin-top: 2px; }
+
+.reporter-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid #F0E8DE;
+}
+.reporter-item:last-child { border-bottom: none; }
+.reporter-name { font-size: 15px; font-weight: 500; }
+.reporter-count { font-size: 15px; color: var(--brown); font-weight: 600; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab {
+  flex: 1; padding: 8px; text-align: center; border-radius: 8px;
+  background: #F0E8DE; color: var(--text-light); cursor: pointer;
+  font-size: 14px; font-weight: 500; border: none; transition: all 0.2s;
+}
+.tab.active { background: var(--brown); color: #FFF; }
+
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--text); color: #FFF; padding: 10px 24px;
+  border-radius: 8px; font-size: 14px; z-index: 999;
+  opacity: 0; transition: opacity 0.3s; max-width: 90%; text-align: center;
+}
+.toast.show { opacity: 1; }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+
+.remind-box {
+  background: #FFF8F0; border: 1px dashed var(--gold);
+  border-radius: 8px; padding: 12px; margin-top: 12px;
+  font-size: 13px; color: var(--text-light); word-break: break-all;
+}
+
+.tab-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; background: #FFF;
+  display: flex; border-top: 1px solid #F0E8DE; z-index: 100;
+}
+.tab-nav button {
+  flex: 1; padding: 10px; border: none; background: none;
+  font-size: 13px; color: var(--text-light); cursor: pointer;
+}
+.tab-nav button.active { color: var(--brown); font-weight: 600; }
+.tab-nav button.active::after {
+  content: ''; position: absolute; bottom: 0; left: 20%; right: 20%;
+  height: 3px; background: var(--brown); border-radius: 2px;
+}
+
+.history-item {
+  display: flex; justify-content: space-between; padding: 10px 0;
+  border-bottom: 1px solid #F0E8DE; font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brown-bg: #1A1512; --brown-card: #2A221C;
+    --text: #EDE0D4; --text-light: #A89888;
+  }
+}
+
+/* ── Setup Modal ── */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 1000;
+  justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #FFF; border-radius: var(--radius); padding: 24px;
+  max-width: 400px; width: 100%; max-height: 80vh; overflow-y: auto;
+}
+.modal h3 { font-size: 18px; color: var(--brown); margin-bottom: 12px; }
+.modal p { font-size: 14px; color: var(--text-light); margin-bottom: 12px; line-height: 1.6; }
+.modal code {
+  display: block; background: #F5F0EB; padding: 8px; border-radius: 6px;
+  font-size: 12px; word-break: break-all; margin: 8px 0;
+}
+.modal .step { margin-bottom: 16px; }
+.modal .step-num {
+  display: inline-block; width: 22px; height: 22px; background: var(--brown);
+  color: #FFF; border-radius: 50%; text-align: center; font-size: 13px;
+  line-height: 22px; margin-right: 6px;
+}
+.modal-overlay { display: none; }
+.modal-overlay.show { display: flex; }
+
+/* admin panel */
+.admin-toggle { text-align: center; padding: 12px 0; }
+.admin-toggle button {
+  background: none; border: none; color: var(--text-light);
+  font-size: 13px; cursor: pointer; text-decoration: underline;
+}
+.admin-panel { display: none; }
+.admin-panel.show { display: block; }
+.btn-danger { background: var(--danger); color: #FFF; }
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<!-- Setup Modal -->
+<div class="modal-overlay" id="setup-modal">
+  <div class="modal">
+    <h3>🔧 首次配置</h3>
+    <p>这是第一次使用，需要连接 Airtable 数据库。</p>
+    <div class="step">
+      <span class="step-num">1</span>
+      <span>注册 Airtable 免费账号</span>
+      <code>1. 打开 https://airtable.com<br>2. 用邮箱注册（免费）</code>
+    </div>
+    <div class="step">
+      <span class="step-num">2</span>
+      <span>创建 API Token</span>
+      <code>1. 打开 https://airtable.com/create/tokens<br>2. 勾选 data.records:read + data.records:write<br>3. 创建后复制 token（以 pat_ 开头）</code>
+    </div>
+    <div class="step">
+      <span class="step-num">3</span>
+      <span>创建报餐 Base</span>
+      <code>1. 点击 + Add a base → Start from scratch<br>2. 命名为「后山报餐」<br>3. 把 Table 1 改名为「报餐」<br>4. 添加列：<br>   姓名(文本) 人数(数字) 日期(日期)<br>   餐次(单选:早/中/晚) 备注(长文本)<br>5. URL 里找到 Base ID (appxxxxxx)</code>
+    </div>
+    <div class="form-group">
+      <label>Airtable API Token</label>
+      <input type="text" id="setup-key" placeholder="pat_xxxxxx">
+    </div>
+    <div class="form-group">
+      <label>Base ID</label>
+      <input type="text" id="setup-base" placeholder="appxxxxxx">
+    </div>
+    <button class="btn btn-primary" onclick="saveSetup()">✅ 连接并保存</button>
+  </div>
+</div>
+
+<div class="container" id="app">
+  <div class="header">
+    <h1>☕ 后山报餐</h1>
+    <div class="subtitle" id="subtitle">加载中...</div>
+    <div class="setup-notice" id="setup-notice" style="display:none">
+      ⚠️ 还未配置数据库，<a href="#" onclick="showSetup()" style="color:var(--brown)">点击配置</a>
+    </div>
+  </div>
+
+  <div class="tab-nav">
+    <button class="active" onclick="switchTab('report')" id="tab-report">📋 报餐</button>
+    <button onclick="switchTab('stats')" id="tab-stats">📊 统计</button>
+    <button onclick="switchTab('history')" id="tab-history">📅 历史</button>
+  </div>
+
+  <!-- 报餐 Tab -->
+  <div id="page-report">
+    <div class="card">
+      <div class="form-group">
+        <label>👤 姓名</label>
+        <input type="text" id="input-name" placeholder="请输入姓名" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label>👥 用餐人数</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn btn-gold btn-sm" onclick="adjustCount(-1)" style="font-size:20px;width:44px;height:44px;border-radius:50%">−</button>
+          <input type="number" id="input-count" value="1" min="1" max="50" style="text-align:center;font-size:20px;font-weight:700;width:80px;flex:none">
+          <button class="btn btn-gold btn-sm" onclick="adjustCount(1)" style="font-size:20px;width:44px;height:44px;border-radius:50%">+</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>🍽️ 餐次</label>
+        <select id="input-meal">
+          <option value="早餐">早餐</option>
+          <option value="午餐" selected>午餐</option>
+          <option value="晚餐">晚餐</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>📝 备注（可不填）</label>
+        <input type="text" id="input-note" placeholder="如：有忌口、带小孩等">
+      </div>
+      <button class="btn btn-primary" onclick="submitReport()" id="submit-btn">✅ 提交报餐</button>
+    </div>
+
+    <div class="remind-box" id="summary-text">
+      提交报餐后，这里会自动生成可复制的汇总文字
+    </div>
+    <button class="btn btn-gold btn-sm" onclick="copySummary()" style="margin-top:8px;width:100%">📋 复制通报文字到微信</button>
+  </div>
+
+  <!-- 统计 Tab -->
+  <div id="page-stats" style="display:none">
+    <div class="tabs">
+      <button class="tab active" onclick="switchMeal('早餐')" id="mt-早餐">早餐</button>
+      <button class="tab" onclick="switchMeal('午餐')" id="mt-午餐">午餐</button>
+      <button class="tab" onclick="switchMeal('晚餐')" id="mt-晚餐">晚餐</button>
+    </div>
+
+    <div class="card">
+      <div class="stats-row">
+        <div class="stat-item">
+          <h2 id="total-count">0</h2>
+          <p>总人数</p>
+        </div>
+        <div class="stat-item">
+          <h2 id="reporter-count">0</h2>
+          <p>已报人数</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:15px;color:var(--text-light);margin-bottom:8px">📋 报餐明细</h3>
+      <div id="reporter-list"></div>
+    </div>
+
+    <div class="admin-toggle">
+      <button onclick="toggleAdmin()">🔧 管理员</button>
+    </div>
+    <div class="admin-panel card" id="admin-panel">
+      <button class="btn btn-danger btn-sm" onclick="clearToday()" style="width:100%;margin-bottom:10px">🔄 重置今日报餐</button>
+      <button class="btn btn-gold btn-sm" onclick="showSetup()" style="width:100%;margin-bottom:10px">🔗 重新配置数据库</button>
+      <button class="btn btn-sm" onclick="exportData()" style="width:100%;background:#EEE;color:var(--text)">📥 导出今日数据</button>
+    </div>
+  </div>
+
+  <!-- 历史 Tab -->
+  <div id="page-history" style="display:none">
+    <div class="tabs">
+      <button class="tab active" onclick="loadHistory(7)" id="hd-7">近7天</button>
+      <button class="tab" onclick="loadHistory(14)" id="hd-14">近14天</button>
+      <button class="tab" onclick="loadHistory(30)" id="hd-30">近30天</button>
+    </div>
+    <div class="card">
+      <h3 style="font-size:15px;color:var(--text-light);margin-bottom:8px">📅 报餐记录</h3>
+      <div id="history-list"><p style="color:var(--text-light);font-size:14px">加载中...</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// 配置
+// ═══════════════════════════════════════════════
+const TODAY = new Date().toISOString().split('T')[0];
+const AIRTABLE_URL = 'https://api.airtable.com/v0';
+
+let config = {
+  apiKey: ***
+  baseId: 'appOT7X6GJkAr8Nca',
+};
+let currentMeal = '午餐';
+
+// ── 加载配置 ──
+function loadConfig() {
+  try {
+    const saved = localStorage.getItem('houshan_airtable_config');
+    if (saved) {
+      const c = JSON.parse(saved);
+      if (c.apiKey) config = c;
+    }
+  } catch(e) {}
+  if (!config.apiKey) {
+    // 预填 Base ID
+    document.getElementById('setup-base').value = config.baseId;
+    document.getElementById('setup-modal').classList.add('show');
+    return false;
+  }
+  return true;
+}
+
+function saveConfig() {
+  config.apiKey = document.getElementById('setup-key').value.trim();
+  config.baseId = document.getElementById('setup-base').value.trim();
+  localStorage.setItem('houshan_airtable_config', JSON.stringify(config));
+  document.getElementById('setup-modal').classList.remove('show');
+  document.getElementById('setup-notice').style.display = 'none';
+  loadStats();
+}
+
+function showSetup() {
+  document.getElementById('setup-modal').classList.add('show');
+  if (config.apiKey) {
+    document.getElementById('setup-key').value = config.apiKey;
+    document.getElementById('setup-base').value = config.baseId;
+  }
+}
+
+function saveSetup() {
+  saveConfig();
+  showToast('✅ 配置已保存，正在加载数据...', 'success');
+}
+
+// ── Airtable API ──
+async function airtableFetch(method, path, data = null) {
+  const url = `${AIRTABLE_URL}${path}`;
+  const opts = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+  };
+  if (data) opts.body = JSON.stringify(data);
+
+  const resp = await fetch(url, opts);
+  const json = await resp.json();
+  if (!resp.ok) {
+    const msg = json?.error?.message || json?.error?.type || '未知错误';
+    throw new Error(msg);
+  }
+  return json;
+}
+
+// ── 查询今日报餐 ──
+async function fetchTodayMeals(mealTime) {
+  const formula = encodeURIComponent(
+    `AND({日期}='${TODAY}', {餐次}='${mealTime}')`
+  );
+  const tableId = encodeURIComponent('报餐');
+  const data = await airtableFetch(
+    'GET',
+    `/${config.baseId}/${tableId}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=姓名`
+  );
+  return data.records || [];
+}
+
+// ── 统计 ──
+async function loadStats() {
+  if (!config.apiKey) {
+    document.getElementById('setup-notice').style.display = 'block';
+    return;
+  }
+
+  try {
+    const records = await fetchTodayMeals(currentMeal);
+    const reporters = {};
+    records.forEach(r => {
+      const f = r.fields;
+      const name = f['姓名'] || '未知';
+      const count = f['人数'] || 1;
+      if (reporters[name]) {
+        reporters[name] += count;
+      } else {
+        reporters[name] = count;
+      }
+    });
+
+    const names = Object.keys(reporters);
+    const total = names.reduce((s, n) => s + reporters[n], 0);
+
+    document.getElementById('total-count').textContent = total;
+    document.getElementById('reporter-count').textContent = names.length;
+
+    const list = document.getElementById('reporter-list');
+    if (names.length === 0) {
+      list.innerHTML = '<p style="color:var(--text-light);font-size:14px;text-align:center;padding:16px 0">暂无报餐记录</p>';
+    } else {
+      list.innerHTML = names.map(n =>
+        `<div class="reporter-item">
+          <span class="reporter-name">${escapeHtml(n)}</span>
+          <span class="reporter-count">${reporters[n]} 位</span>
+        </div>`
+      ).join('');
+    }
+
+    // 更新通报文字
+    updateSummary(names, reporters, total);
+  } catch(e) {
+    console.error('loadStats error:', e);
+    if (e.message.includes('NOT_FOUND') || e.message.includes('AUTH')) {
+      showToast('⚠️ 数据库配置有误，请重新配置', 'error');
+    }
+  }
+}
+
+function updateSummary(names, reporters, total) {
+  const box = document.getElementById('summary-text');
+  if (names.length === 0) {
+    box.innerHTML = '暂无报餐，快去提交吧 ☕';
+    return;
+  }
+  const lines = names.map(n => `${n} ${reporters[n]}位`);
+  box.innerHTML = `📋 今日${currentMeal}报餐汇总：\n${lines.join('、')}\n共 ${total} 位`;
+}
+
+// ── 提交报餐 ──
+async function submitReport() {
+  if (!config.apiKey) { showSetup(); return; }
+
+  const name = document.getElementById('input-name').value.trim();
+  const count = parseInt(document.getElementById('input-count').value) || 1;
+  const meal = document.getElementById('input-meal').value;
+  const note = document.getElementById('input-note').value.trim();
+  const btn = document.getElementById('submit-btn');
+
+  if (!name) { showToast('请填写姓名', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '提交中...';
+
+  try {
+    const tableId = encodeURIComponent('报餐');
+    await airtableFetch('POST', `/${config.baseId}/${tableId}`, {
+      records: [{
+        fields: {
+          '姓名': name,
+          '人数': count,
+          '日期': TODAY,
+          '餐次': meal,
+          '备注': note,
+        }
+      }],
+      typecast: true,
+    });
+
+    showToast(`✅ ${name} ${count}位，已记录`, 'success');
+    document.getElementById('input-name').value = '';
+    document.getElementById('input-count').value = '1';
+    document.getElementById('input-note').value = '';
+    await loadStats();
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✅ 提交报餐';
+  }
+}
+
+// ── Copy ──
+function copySummary() {
+  const text = document.getElementById('summary-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('📋 已复制，粘贴到微信群即可', 'success');
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    showToast('📋 已复制', 'success');
+  });
+}
+
+// ── Clear today ──
+async function clearToday() {
+  if (!confirm(`确定要删除今日 ${currentMeal} 的全部报餐记录吗？`)) return;
+  try {
+    const records = await fetchTodayMeals(currentMeal);
+    const ids = records.map(r => r.id);
+    if (ids.length === 0) { showToast('今日暂无记录', 'info'); return; }
+
+    // Airtable 一次最多删 10 条
+    for (let i = 0; i < ids.length; i += 10) {
+      const batch = ids.slice(i, i + 10);
+      const params = batch.map(id => `records[]=${id}`).join('&');
+      const tableId = encodeURIComponent('报餐');
+      await airtableFetch('DELETE', `/${config.baseId}/${tableId}?${params}`);
+    }
+    showToast('✅ 已重置', 'success');
+    await loadStats();
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+}
+
+// ── Export ──
+async function exportData() {
+  try {
+    const records = await fetchTodayMeals(currentMeal);
+    const data = records.map(r => ({
+      name: r.fields['姓名'] || '',
+      count: r.fields['人数'] || 1,
+      meal: r.fields['餐次'] || '',
+      note: r.fields['备注'] || '',
+      time: r.fields['报餐时间'] || r.createdTime,
+    }));
+    const blob = new Blob([JSON.stringify({date: TODAY, meal: currentMeal, records: data}, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `报餐_${TODAY}_${currentMeal}.json`;
+    a.click();
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+}
+
+// ── History ──
+async function loadHistory(days) {
+  const list = document.getElementById('history-list');
+  list.innerHTML = '<p style="color:var(--text-light)">加载中...</p>';
+
+  if (!config.apiKey) { list.innerHTML = '<p style="color:var(--text-light)">请先配置数据库</p>'; return; }
+
+  try {
+    // 计算起始日期
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    const startStr = start.toISOString().split('T')[0];
+
+    const formula = encodeURIComponent(
+      `IS_AFTER({日期}, DATEADD('${startStr}', -1, 'days'))`
+    );
+    const tableId = encodeURIComponent('报餐');
+    const data = await airtableFetch(
+      'GET',
+      `/${config.baseId}/${tableId}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=日期&sort%5B1%5D%5Bfield%5D=餐次&sort%5B0%5D%5Bdirection%5D=desc`
+    );
+
+    // 按日期+餐次分组
+    const groups = {};
+    (data.records || []).forEach(r => {
+      const f = r.fields;
+      const key = `${f['日期']} ${f['餐次']}`;
+      if (!groups[key]) groups[key] = { total: 0, people: new Set() };
+      groups[key].total += f['人数'] || 1;
+      groups[key].people.add(f['姓名']);
+    });
+
+    const entries = Object.entries(groups);
+    if (entries.length === 0) {
+      list.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:16px 0">暂无历史记录</p>';
+      return;
+    }
+
+    list.innerHTML = entries.map(([key, val]) =>
+      `<div class="history-item">
+        <span>${key}</span>
+        <span style="color:var(--brown);font-weight:600">${val.total} 位 / ${val.people.size} 人</span>
+      </div>`
+    ).join('');
+  } catch(e) {
+    list.innerHTML = '<p style="color:var(--danger)">加载失败</p>';
+  }
+}
+
+// ── Utils ──
+function adjustCount(delta) {
+  const inp = document.getElementById('input-count');
+  let v = parseInt(inp.value) || 1;
+  inp.value = Math.max(1, Math.min(50, v + delta));
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  ['report','stats','history'].forEach(p => {
+    document.getElementById('page-' + p).style.display = p === name ? 'block' : 'none';
+  });
+  if (name === 'stats') loadStats();
+  if (name === 'history') loadHistory(7);
+}
+
+function switchMeal(mt) {
+  currentMeal = mt;
+  document.querySelectorAll('#page-stats .tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('mt-' + mt).classList.add('active');
+  loadStats();
+}
+
+function toggleAdmin() {
+  document.getElementById('admin-panel').classList.toggle('show');
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('subtitle').textContent = new Date().toLocaleDateString('zh-CN', {
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+  });
+  loadConfig();
+  if (config.apiKey) loadStats();
+});
+</script>
+</body>
+</html>
