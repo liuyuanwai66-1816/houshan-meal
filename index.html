@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<!-- 微信分享美化 -->
+<meta property="og:title" content="☕ 后山报餐">
+<meta property="og:description" content="微信报餐自动统计系统 - 提交即汇总，一键复制到群">
+<meta name="description" content="后山报餐系统 - 微信报餐自动统计">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
+
 <title>后山报餐系统</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -221,6 +229,11 @@ body {
 
     <div class="card">
       <h3 style="font-size:15px;color:var(--text-light);margin-bottom:8px">📋 报餐明细</h3>
+      <div style="display:flex;font-size:12px;color:var(--text-light);padding:4px 0;border-bottom:1px solid #F0E8DE;font-weight:500">
+        <span style="flex:2">姓名</span>
+        <span style="flex:1;text-align:center">人数</span>
+        <span style="flex:2;text-align:right">备注</span>
+      </div>
       <div id="reporter-list"></div>
     </div>
 
@@ -306,11 +319,15 @@ async function loadStats() {
   try {
     const records = await fetchTodayMeals(currentMeal);
     const reporters = {};
+    const notes = {};
     records.forEach(r => {
       const f = r.fields;
       const name = f['姓名'] || '未知';
       const count = f['人数'] || 1;
       reporters[name] = (reporters[name] || 0) + count;
+      if (f['备注']) {
+        notes[name] = notes[name] ? notes[name] + '; ' + f['备注'] : f['备注'];
+      }
     });
     const names = Object.keys(reporters);
     const total = names.reduce((s, n) => s + reporters[n], 0);
@@ -321,22 +338,30 @@ async function loadStats() {
       list.innerHTML = '<p style="color:var(--text-light);font-size:14px;text-align:center;padding:16px 0">暂无报餐记录</p>';
     } else {
       list.innerHTML = names.map(n =>
-        '<div class="reporter-item"><span class="reporter-name">' + escapeHtml(n) + '</span><span class="reporter-count">' + reporters[n] + ' 位</span></div>'
+        '<div class="reporter-item" style="display:flex;align-items:center">' +
+          '<span class="reporter-name" style="flex:2">' + escapeHtml(n) + '</span>' +
+          '<span class="reporter-count" style="flex:1;text-align:center">' + reporters[n] + ' 位</span>' +
+          '<span style="flex:2;text-align:right;font-size:12px;color:var(--text-light)">' + (notes[n] ? escapeHtml(notes[n]) : '') + '</span>' +
+        '</div>'
       ).join('');
     }
-    updateSummary(names, reporters, total);
+    updateSummary(names, reporters, total, notes);
   } catch(e) {
     console.error('loadStats error:', e);
   }
 }
 
-function updateSummary(names, reporters, total) {
+function updateSummary(names, reporters, total, notesMap) {
   const box = document.getElementById('summary-text');
   if (names.length === 0) {
     box.innerHTML = '暂无报餐，快去提交吧 ☕';
     return;
   }
-  const lines = names.map(n => n + ' ' + reporters[n] + '位');
+  const lines = names.map(function(n) {
+    var text = n + ' ' + reporters[n] + '位';
+    if (notesMap && notesMap[n]) text += '(' + notesMap[n] + ')';
+    return text;
+  });
   box.innerHTML = '📋 今日' + currentMeal + '报餐汇总：\n' + lines.join('、') + '\n共 ' + total + ' 位';
 }
 
@@ -361,6 +386,11 @@ async function submitReport() {
     document.getElementById('input-count').value = '1';
     document.getElementById('input-note').value = '';
     await loadStats();
+    // 自动复制汇总到剪贴板
+    setTimeout(function() {
+      copySummary();
+      showToast('📋 汇总已复制，去微信群粘贴', 'success');
+    }, 500);
   } catch(e) {
     showToast('❌ ' + e.message, 'error');
   } finally {
