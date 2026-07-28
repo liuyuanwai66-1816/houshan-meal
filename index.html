@@ -264,8 +264,15 @@ body {
 const TODAY = new Date().toISOString().split('T')[0];
 const AIRTABLE_URL = 'https://api.airtable.com/v0';
 
+// 先从 URL 参数获取 API Key（?k=xxx）
+const urlParams = new URLSearchParams(window.location.search);
+const urlKey = urlParams.get('k');
+if (urlKey) {
+  localStorage.setItem('houshan_airtable_key', urlKey);
+}
+
 let config = {
-  apiKey: 'patcO...28',
+  apiKey: localStorage.getItem('houshan_airtable_key') || '',
   baseId: 'appOT7X6GJkAr8Nca',
 };
 let currentMeal = '午餐';
