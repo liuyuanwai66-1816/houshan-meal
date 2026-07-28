@@ -125,33 +125,7 @@ body {
     --brown-bg: #1A1512; --brown-card: #2A221C;
     --text: #EDE0D4; --text-light: #A89888;
   }
-}
-
-/* ── Setup Modal ── */
-.modal-overlay {
-  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.5); z-index: 1000;
-  justify-content: center; align-items: center; padding: 20px;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-  background: #FFF; border-radius: var(--radius); padding: 24px;
-  max-width: 400px; width: 100%; max-height: 80vh; overflow-y: auto;
-}
-.modal h3 { font-size: 18px; color: var(--brown); margin-bottom: 12px; }
-.modal p { font-size: 14px; color: var(--text-light); margin-bottom: 12px; line-height: 1.6; }
-.modal code {
-  display: block; background: #F5F0EB; padding: 8px; border-radius: 6px;
-  font-size: 12px; word-break: break-all; margin: 8px 0;
-}
-.modal .step { margin-bottom: 16px; }
-.modal .step-num {
-  display: inline-block; width: 22px; height: 22px; background: var(--brown);
-  color: #FFF; border-radius: 50%; text-align: center; font-size: 13px;
-  line-height: 22px; margin-right: 6px;
-}
-.modal-overlay { display: none; }
-.modal-overlay.show { display: flex; }
+.btn-danger { background: var(--danger); color: #FFF; }
 
 /* admin panel */
 .admin-toggle { text-align: center; padding: 12px 0; }
@@ -167,35 +141,21 @@ body {
 <body>
 <div class="toast" id="toast"></div>
 
-<!-- Setup Modal -->
-<div class="modal-overlay" id="setup-modal">
-  <div class="modal">
-    <h3>🔧 首次配置</h3>
-    <p>这是第一次使用，需要连接 Airtable 数据库。</p>
-    <div class="step">
-      <span class="step-num">1</span>
-      <span>注册 Airtable 免费账号</span>
-      <code>1. 打开 https://airtable.com<br>2. 用邮箱注册（免费）</code>
-    </div>
-    <div class="step">
-      <span class="step-num">2</span>
-      <span>创建 API Token</span>
-      <code>1. 打开 https://airtable.com/create/tokens<br>2. 勾选 data.records:read + data.records:write<br>3. 创建后复制 token（以 pat_ 开头）</code>
-    </div>
-    <div class="step">
-      <span class="step-num">3</span>
-      <span>创建报餐 Base</span>
-      <code>1. 点击 + Add a base → Start from scratch<br>2. 命名为「后山报餐」<br>3. 把 Table 1 改名为「报餐」<br>4. 添加列：<br>   姓名(文本) 人数(数字) 日期(日期)<br>   餐次(单选:早/中/晚) 备注(长文本)<br>5. URL 里找到 Base ID (appxxxxxx)</code>
-    </div>
+<!-- ── 配置横幅（代替遮罩弹窗） ── -->
+<div class="card" id="setup-banner" style="display:none;border:2px solid var(--gold);background:#FFFDF5">
+  <div style="text-align:center">
+    <h3 style="color:var(--brown);margin-bottom:8px">🔧 首次使用配置</h3>
+    <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">填入你的 Airtable API Token 即可开始使用（只需一次）</p>
     <div class="form-group">
       <label>Airtable API Token</label>
-      <input type="text" id="setup-key" placeholder="pat_xxxxxx">
+      <input type="text" id="setup-key" placeholder="pat_xxxxxx" style="font-size:14px">
     </div>
     <div class="form-group">
       <label>Base ID</label>
-      <input type="text" id="setup-base" placeholder="appxxxxxx">
+      <input type="text" id="setup-base" placeholder="appxxxxxx" style="font-size:14px">
     </div>
-    <button class="btn btn-primary" onclick="saveSetup()">✅ 连接并保存</button>
+    <button class="btn btn-primary" onclick="saveSetup()" style="margin-bottom:8px">✅ 保存配置</button>
+    <p style="font-size:12px;color:var(--text-light)">Token 只存本地浏览器，不会上传</p>
   </div>
 </div>
 
@@ -203,9 +163,6 @@ body {
   <div class="header">
     <h1>☕ 后山报餐</h1>
     <div class="subtitle" id="subtitle">加载中...</div>
-    <div class="setup-notice" id="setup-notice" style="display:none">
-      ⚠️ 还未配置数据库，<a href="#" onclick="showSetup()" style="color:var(--brown)">点击配置</a>
-    </div>
   </div>
 
   <div class="tab-nav">
@@ -281,7 +238,7 @@ body {
     </div>
     <div class="admin-panel card" id="admin-panel">
       <button class="btn btn-danger btn-sm" onclick="clearToday()" style="width:100%;margin-bottom:10px">🔄 重置今日报餐</button>
-      <button class="btn btn-gold btn-sm" onclick="showSetup()" style="width:100%;margin-bottom:10px">🔗 重新配置数据库</button>
+      <button class="btn btn-gold btn-sm" onclick="document.getElementById('setup-banner').style.display='block'" style="width:100%;margin-bottom:10px">🔗 重新配置数据库</button>
       <button class="btn btn-sm" onclick="exportData()" style="width:100%;background:#EEE;color:var(--text)">📥 导出今日数据</button>
     </div>
   </div>
@@ -323,9 +280,8 @@ function loadConfig() {
     }
   } catch(e) {}
   if (!config.apiKey) {
-    // 预填 Base ID
     document.getElementById('setup-base').value = config.baseId;
-    document.getElementById('setup-modal').classList.add('show');
+    document.getElementById('setup-banner').style.display = 'block';
     return false;
   }
   return true;
@@ -335,22 +291,13 @@ function saveConfig() {
   config.apiKey = document.getElementById('setup-key').value.trim();
   config.baseId = document.getElementById('setup-base').value.trim();
   localStorage.setItem('houshan_airtable_config', JSON.stringify(config));
-  document.getElementById('setup-modal').classList.remove('show');
-  document.getElementById('setup-notice').style.display = 'none';
+  document.getElementById('setup-banner').style.display = 'none';
   loadStats();
-}
-
-function showSetup() {
-  document.getElementById('setup-modal').classList.add('show');
-  if (config.apiKey) {
-    document.getElementById('setup-key').value = config.apiKey;
-    document.getElementById('setup-base').value = config.baseId;
-  }
 }
 
 function saveSetup() {
   saveConfig();
-  showToast('✅ 配置已保存，正在加载数据...', 'success');
+  showToast('✅ 配置已保存', 'success');
 }
 
 // ── Airtable API ──
@@ -390,7 +337,7 @@ async function fetchTodayMeals(mealTime) {
 // ── 统计 ──
 async function loadStats() {
   if (!config.apiKey) {
-    document.getElementById('setup-notice').style.display = 'block';
+    document.getElementById('setup-banner').style.display = 'block';
     return;
   }
 
@@ -448,7 +395,7 @@ function updateSummary(names, reporters, total) {
 
 // ── 提交报餐 ──
 async function submitReport() {
-  if (!config.apiKey) { showSetup(); return; }
+  if (!config.apiKey) { document.getElementById('setup-banner').style.display = 'block'; return; }
 
   const name = document.getElementById('input-name').value.trim();
   const count = parseInt(document.getElementById('input-count').value) || 1;
