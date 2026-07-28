@@ -294,7 +294,7 @@ function tableUrl() {
 
 async function fetchTodayMeals(mealTime) {
   const formula = encodeURIComponent(
-    "AND({日期}='" + TODAY + "', {餐次}='" + mealTime + "')"
+    "AND(DATESTR({日期})='" + TODAY + "', {餐次}='" + mealTime + "')"
   );
   const data = await airtableFetch('GET', tableUrl() + '?filterByFormula=' + formula + '&sort%5B0%5D%5Bfield%5D=姓名');
   return data.records || [];
