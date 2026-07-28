@@ -461,29 +461,76 @@ async function loadHistory(days) {
   list.innerHTML = '<p style="color:var(--text-light)">加载中...</p>';
   if (!config.apiKey) { list.innerHTML = '<p style="color:var(--text-light)">请先配置数据库</p>'; return; }
   try {
+    // 查询报餐数据
+    const data = await airtableFetch('GET', tableUrl() + '?maxRecords=500&sort%5B0%5D%5Bfield%5D=日期&sort%5B0%5D%5Bdirection%5D=desc');
+    
+    // 按日期筛选
     const start = new Date();
     start.setDate(start.getDate() - days);
     const startStr = start.toISOString().split('T')[0];
-    const formula = encodeURIComponent("IS_AFTER({日期}, DATEAD'" + startStr + "', -1, 'days'))");
-    // Fix: simpler formula
-    const data = await airtableFetch('GET', tableUrl() + '?maxRecords=200&sort%5B0%5D%5Bfield%5D=日期&sort%5B0%5D%5Bdirection%5D=desc');
+    
+    // 个人统计 + 日期分组
+    const personTotals = {};
     const groups = {};
+    let filteredCount = 0;
+    
     (data.records || []).forEach(r => {
       const f = r.fields;
-      if (!f['日期']) return;
+      if (!f['日期'] || f['日期'] < startStr) return;
+      filteredCount++;
+      
+      // 按日期+餐次分组
       const key = f['日期'] + ' ' + (f['餐次'] || '');
       if (!groups[key]) groups[key] = { total: 0, people: new Set() };
       groups[key].total += f['人数'] || 1;
       if (f['姓名']) groups[key].people.add(f['姓名']);
+      
+      // 个人统计
+      const name = f['姓名'] || '未知';
+      if (!personTotals[name]) personTotals[name] = { count: 0, meals: 0 };
+      personTotals[name].count += 1;  // 报餐次数
+      personTotals[name].meals += f['人数'] || 1;  // 总人数
     });
-    const entries = Object.entries(groups).slice(0, 30);
-    if (entries.length === 0) {
-      list.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:16px 0">暂无历史记录</p>';
+    
+    if (filteredCount === 0) {
+      list.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:16px 0">该时间段暂无记录</p>';
       return;
     }
-    list.innerHTML = entries.map(([key, val]) =>
-      '<div class="history-item"><span>' + key + '</span><span style="color:var(--brown);font-weight:600">' + val.total + ' 位 / ' + val.people.size + ' 人</span></div>'
-    ).join('');
+    
+    var html = '';
+    
+    // 按日期分组展示
+    var entries = Object.entries(groups).slice(0, 30);
+    html += '<h4 style="font-size:13px;color:var(--text-light);margin-bottom:6px">📅 每日明细</h4>';
+    html += entries.map(function(e) {
+      return '<div class="history-item"><span>' + e[0] + '</span><span style="color:var(--brown);font-weight:600">' + e[1].total + ' 位 / ' + e[1].people.size + ' 人</span></div>';
+    }).join('');
+    
+    // 个人汇总
+    var personNames = Object.keys(personTotals).sort(function(a, b) {
+      return personTotals[b].meals - personTotals[a].meals;
+    });
+    var grandTotal = personNames.reduce(function(s, n) { return s + personTotals[n].meals; }, 0);
+    
+    html += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--gold-light)">';
+    html += '<h4 style="font-size:13px;color:var(--text-light);margin-bottom:6px">👤 个人统计（近' + days + '天）</h4>';
+    html += '<div class="reporter-item" style="font-size:12px;color:var(--text-light);font-weight:500">';
+    html += '<span>姓名</span><span style="flex:1;text-align:center">报餐次数</span><span style="text-align:right">总人数</span>';
+    html += '</div>';
+    personNames.forEach(function(n) {
+      var p = personTotals[n];
+      html += '<div class="reporter-item" style="font-size:14px">';
+      html += '<span class="reporter-name">' + escapeHtml(n) + '</span>';
+      html += '<span style="flex:1;text-align:center;color:var(--text-light)">' + p.count + ' 次</span>';
+      html += '<span class="reporter-count">' + p.meals + ' 位</span>';
+      html += '</div>';
+    });
+    html += '<div class="reporter-item" style="font-weight:600;border-top:2px solid var(--brown);padding-top:8px;margin-top:4px">';
+    html += '<span>合计</span><span style="flex:1;text-align:center">' + personNames.length + ' 人</span><span class="reporter-count">' + grandTotal + ' 位</span>';
+    html += '</div>';
+    html += '</div>';
+    
+    list.innerHTML = html;
   } catch(e) {
     list.innerHTML = '<p style="color:var(--danger)">加载失败</p>';
   }
