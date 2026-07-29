@@ -324,11 +324,7 @@ body {
     <div class="admin-panel card" id="admin-panel">
       <button class="btn btn-danger btn-sm" onclick="clearToday()" style="width:100%;margin-bottom:10px">🔄 重置今日报餐</button>
       <button class="btn btn-sm" onclick="exportData()" style="width:100%;margin-bottom:10px;background:#EEE;color:var(--text)">📥 导出今日数据</button>
-      <div class="form-group">
-        <label>🤖 微信群机器人 Webhook 地址</label>
-        <input type="text" id="webhook-url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx" style="width:100%;padding:10px 14px;border:1.5px solid var(--gold-light);border-radius:8px;font-size:13px;outline:none">
-        <button class="btn btn-sm" onclick="saveWebhook()" style="margin-top:6px;width:100%;background:var(--brown);color:#FFF;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:13px">💾 保存 Webhook</button>
-      </div>
+
     </div>
   </div>
 
@@ -486,50 +482,15 @@ async function submitReport() {
     document.getElementById('input-note').value = '';
     await loadStats();
 
-    // 自动发送到微信群（如果有配置 webhook）
+    // 自动复制汇总，去微信群粘贴
     setTimeout(function() {
-      sendToWechatGroup();
-    }, 300);
+      copySummary();
+    }, 500);
   } catch(e) {
     showToast('❌ ' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = '✅ 提交报餐';
-  }
-}
-
-// ── 微信群自动发送 ──
-function getWebhookUrl() {
-  return localStorage.getItem('houshan_meal_webhook') || '';
-}
-
-function saveWebhook() {
-  const url = document.getElementById('webhook-url').value.trim();
-  localStorage.setItem('houshan_meal_webhook', url);
-  showToast('✅ Webhook 已保存', 'success');
-}
-
-async function sendToWechatGroup() {
-  const webhook = getWebhookUrl();
-  if (!webhook) return; // 没配置 webhook 就不发
-
-  const summaryEl = document.getElementById('summary-text');
-  const summaryText = summaryEl.textContent || summaryEl.innerText || '';
-  if (!summaryText || summaryText.indexOf('暂无') >= 0) return;
-
-  try {
-    await fetch(webhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        msgtype: 'text',
-        text: { content: summaryText }
-      }),
-    });
-    showToast('📤 已自动发送到微信群', 'success');
-  } catch(e) {
-    console.error('sendToWechatGroup error:', e);
-    showToast('⚠️ 微信群发送失败，请检查 Webhook 地址', 'error');
   }
 }
 
@@ -799,9 +760,7 @@ function switchMeal(mt) {
 
 function toggleAdmin() {
   document.getElementById('admin-panel').classList.toggle('show');
-  // 加载已保存的 webhook
-  const wh = getWebhookUrl();
-  if (wh) document.getElementById('webhook-url').value = wh;
+
 }
 
 function escapeHtml(s) {
