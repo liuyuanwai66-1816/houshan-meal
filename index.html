@@ -6,9 +6,9 @@
 
 <!-- 微信分享美化 -->
 <meta property="og:title" content="☕ 后山报餐">
-<meta property="og:description" content="微信报餐自动统计系统 - 提交即汇总，一键复制到群">
+<meta property="og:description" content="微信报餐自动统计系统 - 厨房菜谱实时同步">
 <meta property="og:image" content="https://liuyuanwai66-1816.github.io/houshan-meal/icon.png">
-<meta name="description" content="后山报餐系统 - 微信报餐自动统计">
+<meta name="description" content="后山报餐系统 - 厨房菜谱实时同步">
 
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
 
@@ -40,6 +40,11 @@ body {
 .header { text-align: center; padding: 24px 0 16px; }
 .header h1 { font-size: 22px; color: var(--brown); font-weight: 700; letter-spacing: 2px; }
 .header .subtitle { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+.header .deadline-remind {
+  font-size: 12px; color: var(--danger); margin-top: 6px;
+  background: #FFF3E0; padding: 6px 10px; border-radius: 6px;
+  line-height: 1.6;
+}
 .header .setup-notice {
   font-size: 12px; color: var(--danger); margin-top: 8px;
   background: #FFF3E0; padding: 8px 12px; border-radius: 8px;
@@ -129,11 +134,75 @@ body {
   border-bottom: 1px solid #F0E8DE; font-size: 14px;
 }
 
+/* ── 今日菜谱展示 ── */
+.dishes-section {
+  background: #FFF8F0; border: 1.5px solid var(--gold);
+  border-radius: var(--radius); padding: 14px 16px; margin-top: 12px;
+}
+.dishes-section h4 {
+  font-size: 14px; color: var(--brown); font-weight: 600;
+  margin-bottom: 8px; text-align: center;
+}
+.dishes-tags {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+}
+.dish-tag {
+  background: var(--gold-light); color: var(--text);
+  padding: 4px 12px; border-radius: 14px;
+  font-size: 13px; font-weight: 500;
+}
+
+/* ── 厨房菜单 Modal ── */
+.modal-overlay {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 1000;
+  justify-content: center; align-items: flex-start;
+  padding-top: 30px; overflow-y: auto;
+}
+.modal-overlay.show { display: flex; }
+.modal-card {
+  background: var(--brown-card); border-radius: var(--radius);
+  width: 92%; max-width: 440px; padding: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  margin-bottom: 30px;
+}
+.modal-title {
+  text-align: center; font-size: 18px; color: var(--brown);
+  font-weight: 700; margin-bottom: 4px;
+}
+.modal-date {
+  text-align: center; font-size: 13px; color: var(--text-light);
+  margin-bottom: 16px;
+}
+.menu-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.menu-index {
+  width: 28px; height: 28px; display: flex; align-items: center;
+  justify-content: center; background: var(--brown);
+  color: #FFF; border-radius: 50%; font-size: 12px; font-weight: 600;
+  flex-shrink: 0;
+}
+.menu-input {
+  flex: 1; padding: 8px 12px; border: 1.5px solid var(--gold-light);
+  border-radius: 8px; font-size: 14px; color: var(--text);
+  outline: none; background: #FFF;
+}
+.menu-input:focus { border-color: var(--gold); }
+.modal-actions {
+  display: flex; gap: 10px; margin-top: 16px;
+}
+.modal-actions .btn { flex: 1; }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --brown-bg: #1A1512; --brown-card: #2A221C;
     --text: #EDE0D4; --text-light: #A89888;
   }
+  .dishes-section { background: #2A221C; }
+  .modal-overlay { background: rgba(0,0,0,0.7); }
+}
 .btn-danger { background: var(--danger); color: #FFF; }
 
 /* admin panel */
@@ -144,6 +213,8 @@ body {
 }
 .admin-panel { display: none; }
 .admin-panel.show { display: block; }
+.admin-panel .form-group { margin-bottom: 10px; }
+.admin-panel .form-group label { font-size: 12px; }
 .btn-danger { background: var(--danger); color: #FFF; }
 </style>
 </head>
@@ -163,6 +234,7 @@ body {
   <div class="header">
     <h1>☕ 后山报餐</h1>
     <div class="subtitle" id="subtitle">加载中...</div>
+    <div class="deadline-remind">⏰ 为保障每个小伙伴的就餐，每日报餐截止午餐10点，晚餐4点，超时算加餐</div>
   </div>
 
   <div class="tab-nav">
@@ -201,10 +273,18 @@ body {
       <button class="btn btn-primary" onclick="submitReport()" id="submit-btn">✅ 提交报餐</button>
     </div>
 
+    <!-- 今日菜品 -->
+    <div id="todays-dishes"></div>
+
     <div class="remind-box" id="summary-text">
       提交报餐后，这里会自动生成可复制的汇总文字
     </div>
     <button class="btn btn-gold btn-sm" onclick="copySummary()" style="margin-top:8px;width:100%">📋 复制通报文字到微信</button>
+
+    <!-- 厨房信息按钮 -->
+    <button class="btn btn-sm" onclick="openKitchenModal()" style="margin-top:12px;width:100%;background:var(--gold-light);color:var(--text);font-weight:600">
+      🍳 厨房信息
+    </button>
   </div>
 
   <!-- 统计 Tab -->
@@ -243,7 +323,12 @@ body {
     </div>
     <div class="admin-panel card" id="admin-panel">
       <button class="btn btn-danger btn-sm" onclick="clearToday()" style="width:100%;margin-bottom:10px">🔄 重置今日报餐</button>
-      <button class="btn btn-sm" onclick="exportData()" style="width:100%;background:#EEE;color:var(--text)">📥 导出今日数据</button>
+      <button class="btn btn-sm" onclick="exportData()" style="width:100%;margin-bottom:10px;background:#EEE;color:var(--text)">📥 导出今日数据</button>
+      <div class="form-group">
+        <label>🤖 微信群机器人 Webhook 地址</label>
+        <input type="text" id="webhook-url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx" style="width:100%;padding:10px 14px;border:1.5px solid var(--gold-light);border-radius:8px;font-size:13px;outline:none">
+        <button class="btn btn-sm" onclick="saveWebhook()" style="margin-top:6px;width:100%;background:var(--brown);color:#FFF;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:13px">💾 保存 Webhook</button>
+      </div>
     </div>
   </div>
 
@@ -257,6 +342,19 @@ body {
     <div class="card">
       <h3 style="font-size:15px;color:var(--text-light);margin-bottom:8px">📅 报餐记录</h3>
       <div id="history-list"><p style="color:var(--text-light);font-size:14px">加载中...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- 厨房菜单 Modal -->
+<div class="modal-overlay" id="kitchen-modal">
+  <div class="modal-card">
+    <div class="modal-title">🍳 今日菜谱</div>
+    <div class="modal-date" id="modal-date">加载中...</div>
+    <div id="menu-rows"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveKitchenMenu()">✅ 确定</button>
+      <button class="btn btn-sm" onclick="closeKitchenModal()" style="background:#EEE;color:var(--text)">取消</button>
     </div>
   </div>
 </div>
@@ -387,11 +485,11 @@ async function submitReport() {
     document.getElementById('input-count').value = '1';
     document.getElementById('input-note').value = '';
     await loadStats();
-    // 自动复制汇总到剪贴板
+
+    // 自动发送到微信群（如果有配置 webhook）
     setTimeout(function() {
-      copySummary();
-      showToast('📋 汇总已复制，去微信群粘贴', 'success');
-    }, 500);
+      sendToWechatGroup();
+    }, 300);
   } catch(e) {
     showToast('❌ ' + e.message, 'error');
   } finally {
@@ -400,7 +498,131 @@ async function submitReport() {
   }
 }
 
-// ── Copy ──
+// ── 微信群自动发送 ──
+function getWebhookUrl() {
+  return localStorage.getItem('houshan_meal_webhook') || '';
+}
+
+function saveWebhook() {
+  const url = document.getElementById('webhook-url').value.trim();
+  localStorage.setItem('houshan_meal_webhook', url);
+  showToast('✅ Webhook 已保存', 'success');
+}
+
+async function sendToWechatGroup() {
+  const webhook = getWebhookUrl();
+  if (!webhook) return; // 没配置 webhook 就不发
+
+  const summaryEl = document.getElementById('summary-text');
+  const summaryText = summaryEl.textContent || summaryEl.innerText || '';
+  if (!summaryText || summaryText.indexOf('暂无') >= 0) return;
+
+  try {
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        msgtype: 'text',
+        text: { content: summaryText }
+      }),
+    });
+    showToast('📤 已自动发送到微信群', 'success');
+  } catch(e) {
+    console.error('sendToWechatGroup error:', e);
+    showToast('⚠️ 微信群发送失败，请检查 Webhook 地址', 'error');
+  }
+}
+
+// ── 厨房菜谱 ──
+function getMenuKey() {
+  return 'houshan_menu_' + TODAY;
+}
+
+function loadKitchenMenu() {
+  try {
+    const saved = localStorage.getItem(getMenuKey());
+    return saved ? JSON.parse(saved) : ['','','','','','','','',''];
+  } catch(e) {
+    return ['','','','','','','','',''];
+  }
+}
+
+function saveKitchenMenuToStorage(menu) {
+  localStorage.setItem(getMenuKey(), JSON.stringify(menu));
+}
+
+function renderMenuRows() {
+  const menu = loadKitchenMenu();
+  const container = document.getElementById('menu-rows');
+  container.innerHTML = '';
+  for (let i = 0; i < 9; i++) {
+    const row = document.createElement('div');
+    row.className = 'menu-row';
+    row.innerHTML =
+      '<div class="menu-index">' + (i + 1) + '</div>' +
+      '<input class="menu-input" type="text" maxlength="10" value="' + escapeHtml(menu[i] || '') + '" data-idx="' + i + '" placeholder="输入菜品（最多10字）">';
+    container.appendChild(row);
+    // 绑定输入事件：自动保存
+    const inp = row.querySelector('.menu-input');
+    inp.addEventListener('input', function() {
+      const menu2 = loadKitchenMenu();
+      menu2[parseInt(this.dataset.idx)] = this.value;
+      saveKitchenMenuToStorage(menu2);
+    });
+  }
+}
+
+function saveKitchenMenu() {
+  // 收集所有输入
+  const inputs = document.querySelectorAll('#menu-rows .menu-input');
+  const menu = [];
+  inputs.forEach(inp => {
+    menu[parseInt(inp.dataset.idx)] = inp.value;
+  });
+  saveKitchenMenuToStorage(menu);
+  closeKitchenModal();
+  renderTodaysDishes();
+  showToast('✅ 今日菜谱已更新', 'success');
+}
+
+function renderTodaysDishes() {
+  const container = document.getElementById('todays-dishes');
+  const menu = loadKitchenMenu();
+  const dishes = menu.filter(function(d) { return d && d.trim(); });
+  if (dishes.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  const tags = dishes.map(function(d) {
+    return '<span class="dish-tag">' + escapeHtml(d.trim()) + '</span>';
+  }).join('');
+  container.innerHTML =
+    '<div class="dishes-section">' +
+      '<h4>🍳 今日菜品</h4>' +
+      '<div class="dishes-tags">' + tags + '</div>' +
+    '</div>';
+}
+
+function openKitchenModal() {
+  document.getElementById('modal-date').textContent = new Date().toLocaleDateString('zh-CN', {
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+  });
+  renderMenuRows();
+  document.getElementById('kitchen-modal').classList.add('show');
+}
+
+function closeKitchenModal() {
+  document.getElementById('kitchen-modal').classList.remove('show');
+}
+
+// 点击 modal 背景关闭
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal-overlay')) {
+    closeKitchenModal();
+  }
+});
+
+// ── 复制 ──
 function copySummary() {
   const text = document.getElementById('summary-text').textContent;
   navigator.clipboard.writeText(text).then(() => {
@@ -577,6 +799,9 @@ function switchMeal(mt) {
 
 function toggleAdmin() {
   document.getElementById('admin-panel').classList.toggle('show');
+  // 加载已保存的 webhook
+  const wh = getWebhookUrl();
+  if (wh) document.getElementById('webhook-url').value = wh;
 }
 
 function escapeHtml(s) {
@@ -607,6 +832,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('no-key-msg').style.display = 'block';
   } else {
     loadStats();
+    renderTodaysDishes();
   }
 });
 </script>
